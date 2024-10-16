@@ -8,6 +8,89 @@ const stage = new Konva.Stage({
     height: 400,
 });
 
+//================Undo-Redo=================
+
+class Command{
+    execute(){}
+    undo(){}
+}
+
+class AddPolylineCommand extends Command{
+    constructor(polyline, layer){
+        super();
+        this.receiver = layer;
+        this.parameter = polyline;
+    }
+
+    execute(){
+        this.receiver.add(this.parameter);
+    }
+
+    undo(){
+        this.parameter.remove();
+    }
+}
+
+class UndoManager{
+    constructor(){
+        this.undoStack = new Stack();
+        this.redoStack = new Stack();
+    }
+
+    execute(command){
+        try{
+            command.execute();
+            this.undoStack.push(command);
+            this.updateButtons();
+        }
+        catch(e){
+            console.log("could nt excute" + e);
+        }
+
+    }   
+
+    canUndo(){
+        return !this.undoStack.isEmpty();
+    }
+    canRedo(){
+        return !this.redoStack.isEmpty();
+    }
+    
+    undo(){
+        if(this.canUndo()){
+        const command = this.undoStack.pop();
+        command.undo();
+        console.log(command);
+        this.redoStack.push(command);
+        this.updateButtons();
+        }
+        else{
+            console.log("nothing to undo");
+        }
+    }
+
+    redo(){
+        if(this.canRedo()){
+        let command = this.redoStack.pop();
+        command.execute();
+        this.undoStack.push(command);
+        this.updateButtons();
+        }
+        else{
+            console.log("nothing to redo");
+        }
+    }
+
+    updateButtons(){    
+        undoButton.disabled = !this.canUndo();
+        redoButton.disabled = !this.canRedo();
+    }
+
+    
+}
+
+//=======================================================
+
 // Une couche pour le dessin
 const dessin = new Konva.Layer();
 // Une couche pour la polyline en cours de construction
@@ -17,6 +100,7 @@ stage.add(temporaire);
 
 const MAX_POINTS = 10;
 let polyline // La polyline en cours de construction;
+let undoManager = new UndoManager();
 
 const polylineMachine = createMachine(
     {
@@ -119,7 +203,9 @@ const polylineMachine = createMachine(
                 polyline.points(newPoints);
                 polyline.stroke("black"); // On change la couleur
                 // On sauvegarde la polyline dans la couche de dessin
-                dessin.add(polyline); // On l'ajoute à la couche de dessin
+                // dessin.add(polyline); // On l'ajoute à la couche de dessin
+                let command = new AddPolylineCommand(polyline, dessin);
+                undoManager.execute(command);
             },
             addPoint: (context, event) => {
                 const pos = stage.getPointerPosition();
@@ -175,5 +261,15 @@ window.addEventListener("keydown", (event) => {
 // bouton Undo
 const undoButton = document.getElementById("undo");
 undoButton.addEventListener("click", () => {
-    
+   console.log("Undo");
+   undoManager.undo();
 });
+
+
+// bouton Redo
+const redoButton = document.getElementById("redo");
+redoButton.addEventListener("click", () => {
+    console.log("Redo");
+    undoManager.redo();
+});
+
